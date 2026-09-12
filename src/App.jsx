@@ -309,9 +309,8 @@ function LeaderPicker({ value, onChange, label, leaderData, onLeaderDataChange }
             <option value="">نوع الضرر</option>
             {LEADER_DAMAGE_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
           </select>
-          <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={info.coefficient === 0 ? '' : info.coefficient} placeholder="المعامل"
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => onLeaderDataChange(value, { ...info, coefficient: parsePositive(e.target.value) })} />
+          <DecimalInput style={{ ...styles.input, flex: 1 }} value={info.coefficient} placeholder="المعامل"
+            onChange={(v) => onLeaderDataChange(value, { ...info, coefficient: v })} />
         </div>
       )}
       {ESTIMATED_COEFFICIENT_LEADERS.has(value) && (
@@ -324,10 +323,28 @@ function LeaderPicker({ value, onChange, label, leaderData, onLeaderDataChange }
 const STAT_COLORS = { ATK: '#e34948', DEF: '#3d7fd6', HP: '#1baf7a', SPD: '#5ec8d8' };
 
 const arabicToWesternDigits = (str) => str.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-const parsePositive = (str) => Math.max(0, parseFloat(arabicToWesternDigits(str)) || 0);
+const parsePositive = (str) => Math.max(0, parseFloat(arabicToWesternDigits(str).replace(/[،٫,]/g, '.')) || 0);
+
+function DecimalInput({ value, onChange, placeholder, style }) {
+  const [text, setText] = useState(value === 0 ? '' : String(value));
+  useEffect(() => {
+    if (parsePositive(text) !== value) setText(value === 0 ? '' : String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <input type="text" inputMode="decimal" style={style} value={text} placeholder={placeholder || '0'}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => { setText(e.target.value); onChange(parsePositive(e.target.value)); }} />
+  );
+}
 
 function NumberField({ label, value, onChange, icon, negative }) {
   const labelColor = STAT_COLORS[label] || undefined;
+  const [text, setText] = useState(value === 0 ? '' : String(value));
+  useEffect(() => {
+    if (parsePositive(text) !== value) setText(value === 0 ? '' : String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
   return (
     <div>
       <label style={{ ...styles.label, ...(labelColor ? { color: labelColor, fontWeight: 700 } : {}), display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -335,9 +352,9 @@ function NumberField({ label, value, onChange, icon, negative }) {
         {label}
       </label>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <input type="text" inputMode="decimal" style={styles.input} value={value === 0 ? '' : value} placeholder="0"
+        <input type="text" inputMode="decimal" style={styles.input} value={text} placeholder="0"
           onFocus={(e) => e.target.select()}
-          onChange={(e) => onChange(parsePositive(e.target.value))} />
+          onChange={(e) => { setText(e.target.value); onChange(parsePositive(e.target.value)); }} />
         <span style={{ color: '#999999', fontSize: '14px', whiteSpace: 'nowrap' }}>{negative ? '-٪' : '٪'}</span>
       </div>
     </div>
@@ -383,9 +400,7 @@ function TalentsBlock({ stats, onChange }) {
             {TROOP_TYPES.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
           </select>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 70px' }}>
-            <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={stats.vsVal === 0 ? '' : stats.vsVal} placeholder="0"
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => onChange({ ...stats, vsVal: parsePositive(e.target.value) })} />
+            <DecimalInput style={{ ...styles.input, flex: 1 }} value={stats.vsVal} onChange={(v) => onChange({ ...stats, vsVal: v })} />
             <span style={{ color: '#999999', fontSize: '14px' }}>٪</span>
           </div>
         </div>
@@ -412,9 +427,7 @@ function TalentsBlock({ stats, onChange }) {
             {TROOP_TYPES.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
           </select>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 70px' }}>
-            <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={stats.vsValDebuff === 0 ? '' : stats.vsValDebuff} placeholder="0"
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => onChange({ ...stats, vsValDebuff: parsePositive(e.target.value) })} />
+            <DecimalInput style={{ ...styles.input, flex: 1 }} value={stats.vsValDebuff} onChange={(v) => onChange({ ...stats, vsValDebuff: v })} />
             <span style={{ color: '#999999', fontSize: '14px', whiteSpace: 'nowrap' }}>-٪</span>
           </div>
         </div>
@@ -460,29 +473,29 @@ const EQUIPMENT_SETS = {
     traitAtk: 6, traitDef: 6, traitHp: 7, traitSpd: 0, traitTotalDmg: 0,
     atkDebuff: 0, defDebuff: 0, hpDebuff: 2, spdDebuff: 0, totalDebuff: 0,
   },
-  'فرسان 1': {
-    atk: 37, def: 11, hp: 29, spd: 0, totalDmg: 0,
-    genAtk: 0, genDef: 0, genHp: 2, genSpd: 0, genTotalDmg: 0,
-    traitAtk: 9, traitDef: 6, traitHp: 6, traitSpd: 0, traitTotalDmg: 3,
-    atkDebuff: 0, defDebuff: 3, hpDebuff: 0, spdDebuff: 0, totalDebuff: 0,
-  },
-  'رماه 1': {
-    atk: 25.5, def: 35, hp: 11, spd: 0, totalDmg: 0,
-    genAtk: 3, genDef: 0, genHp: 5, genSpd: 0, genTotalDmg: 0,
-    traitAtk: 6, traitDef: 6, traitHp: 8, traitSpd: 0, traitTotalDmg: 0,
-    atkDebuff: 0, defDebuff: 2, hpDebuff: 0, spdDebuff: 0, totalDebuff: 0,
-  },
   'مشاه 2': {
     atk: 20, def: 54, hp: 0, spd: 0, totalDmg: 0,
     genAtk: 0, genDef: 3, genHp: 0, genSpd: 10, genTotalDmg: 0,
     traitAtk: 7, traitDef: 7, traitHp: 8, traitSpd: 5, traitTotalDmg: 4.5,
     atkDebuff: 1, defDebuff: 0, hpDebuff: 3.5, spdDebuff: 0, totalDebuff: 0,
   },
+  'فرسان 1': {
+    atk: 37, def: 11, hp: 29, spd: 0, totalDmg: 0,
+    genAtk: 0, genDef: 0, genHp: 2, genSpd: 0, genTotalDmg: 0,
+    traitAtk: 9, traitDef: 6, traitHp: 6, traitSpd: 0, traitTotalDmg: 3,
+    atkDebuff: 0, defDebuff: 3, hpDebuff: 0, spdDebuff: 0, totalDebuff: 0,
+  },
   'فرسان 2': {
     atk: 37, def: 15, hp: 29, spd: 0, totalDmg: 0,
     genAtk: 0, genDef: 0, genHp: 2, genSpd: 0, genTotalDmg: 0,
     traitAtk: 10.5, traitDef: 7.5, traitHp: 8, traitSpd: 5, traitTotalDmg: 6.5,
     atkDebuff: 0, defDebuff: 3, hpDebuff: 1, spdDebuff: 0, totalDebuff: 0,
+  },
+  'رماه 1': {
+    atk: 25.5, def: 35, hp: 11, spd: 0, totalDmg: 0,
+    genAtk: 3, genDef: 0, genHp: 5, genSpd: 0, genTotalDmg: 0,
+    traitAtk: 6, traitDef: 6, traitHp: 8, traitSpd: 0, traitTotalDmg: 0,
+    atkDebuff: 0, defDebuff: 2, hpDebuff: 0, spdDebuff: 0, totalDebuff: 0,
   },
   'رماه 2': {
     atk: 25.5, def: 20, hp: 32, spd: 0, totalDmg: 0,
