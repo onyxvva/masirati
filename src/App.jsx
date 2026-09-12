@@ -1,30 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, LabelList, ResponsiveContainer, Cell } from 'recharts';
 
-// بديل عن window.storage (خاص ببيئة Claude Artifacts) — يخزن نفس البيانات محلياً على الجهاز
-// عبر localStorage، بنفس الشكل ({ key, value }) اللي يتوقعه باقي الكود، بدون ما نغيّر أي مكان ثاني.
-if (typeof window !== 'undefined' && !window.storage) {
-  window.storage = {
-    async get(key) {
-      const value = localStorage.getItem(key);
-      return value === null ? null : { key, value };
-    },
-    async set(key, value) {
-      localStorage.setItem(key, value);
-      return { key, value };
-    },
-    async delete(key) {
-      const existed = localStorage.getItem(key) !== null;
-      localStorage.removeItem(key);
-      return { key, deleted: existed };
-    },
-    async list(prefix) {
-      const keys = Object.keys(localStorage).filter((k) => !prefix || k.startsWith(prefix));
-      return { keys, prefix };
-    },
-  };
-}
-
 const TYPES = [
   { key: 'skill', label: 'ضرر المهارة' },
   { key: 'counter', label: 'هجوم مضاد' },
@@ -274,7 +250,7 @@ const emptyStats = () => ({ atk: 0, def: 0, hp: 0, spd: 0 });
 const emptyEquip = () => ({ atk: 0, def: 0, hp: 0, spd: 0, totalDmg: 0, genAtk: 0, genDef: 0, genHp: 0, genSpd: 0, genTotalDmg: 0, traitAtk: 0, traitDef: 0, traitHp: 0, traitSpd: 0, traitTotalDmg: 0, atkDebuff: 0, defDebuff: 0, hpDebuff: 0, spdDebuff: 0, totalDebuff: 0 });
 const emptyWeapon = () => ({ atk: 0, def: 0, hp: 0, spd: 0, totalDmg: 0 });
 const emptyFormationDamage = () => ({ skill: 0, normal: 0, finish: 0, rally: 0 });
-const emptyTalents = () => ({ atk: 0, def: 0, hp: 0, spd: 0, normal: 0, counter: 0, finish: 0, finishRanged: 0, totalDmg: 0, vsType: '', vsVal: 0, dmgType: '', dmgVal: 0, atkDebuff: 0, defDebuff: 0, hpDebuff: 0, spdDebuff: 0, normalDebuff: 0, counterDebuff: 0, totalDebuff: 0, dmgTypeDebuff: '', dmgValDebuff: 0, vsTypeDebuff: '', vsValDebuff: 0 });
+const emptyTalents = () => ({ atk: 0, def: 0, hp: 0, spd: 0, normal: 0, counter: 0, skill: 0, finish: 0, rally: 0, finishRanged: 0, totalDmg: 0, vsType: '', vsVal: 0, atkDebuff: 0, defDebuff: 0, hpDebuff: 0, spdDebuff: 0, normalDebuff: 0, counterDebuff: 0, resistSkill: 0, resistFinish: 0, resistRally: 0, totalDebuff: 0, vsTypeDebuff: '', vsValDebuff: 0 });
 
 const styles = {
   page: { background: '#000000', color: '#ffffff', fontFamily: '-apple-system, Segoe UI, Tahoma, Arial, sans-serif', padding: '20px', direction: 'rtl', minHeight: '100vh' },
@@ -382,7 +358,7 @@ function StatBlock({ title, stats, onChange }) {
   );
 }
 
-function TalentsBlock({ stats, onChange, mainType }) {
+function TalentsBlock({ stats, onChange }) {
   return (
     <div style={styles.card}>
       <div style={styles.cardTitle}>المواهب</div>
@@ -393,10 +369,14 @@ function TalentsBlock({ stats, onChange, mainType }) {
           <NumberField label="DEF" value={stats.def} onChange={(v) => onChange({ ...stats, def: v })} />
           <NumberField label="HP" value={stats.hp} onChange={(v) => onChange({ ...stats, hp: v })} />
           <NumberField label="SPD" value={stats.spd} onChange={(v) => onChange({ ...stats, spd: v })} />
+          <NumberField label="ضرر عادي" value={stats.normal} onChange={(v) => onChange({ ...stats, normal: v })} />
           <NumberField label="هجوم مضاد" value={stats.counter} onChange={(v) => onChange({ ...stats, counter: v })} />
+          <NumberField label="ضرر المهارة" value={stats.skill} onChange={(v) => onChange({ ...stats, skill: v })} />
+          <NumberField label="ضربة قاضية" value={stats.finish} onChange={(v) => onChange({ ...stats, finish: v })} />
+          <NumberField label="هجوم المجموعة" value={stats.rally} onChange={(v) => onChange({ ...stats, rally: v })} />
           <NumberField label="ضرر كلي" value={stats.totalDmg} onChange={(v) => onChange({ ...stats, totalDmg: v })} icon={TOTAL_DAMAGE_ICON} />
         </div>
-        <div style={styles.subTitle}>زيادة الضرر ضد :</div>
+        <div style={styles.subTitle}>زيادة الضرر على:</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           <select style={{ ...styles.input, flex: 1 }} value={stats.vsType} onChange={(e) => onChange({ ...stats, vsType: e.target.value })}>
             <option value="">اختر النوع المستهدف</option>
@@ -406,17 +386,6 @@ function TalentsBlock({ stats, onChange, mainType }) {
             <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={stats.vsVal === 0 ? '' : stats.vsVal} placeholder="0"
               onFocus={(e) => e.target.select()}
               onChange={(e) => onChange({ ...stats, vsVal: parsePositive(e.target.value) })} />
-            <span style={{ color: '#999999', fontSize: '14px' }}>٪</span>
-          </div>
-        </div>
-
-        <div style={styles.subTitle}>{mainType ? `ضرر ${mainType.label}` : 'ضرر الضربة القاضية أو المهارة أو هجوم المجموعة'}</div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 70px' }}>
-            <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={stats.dmgVal === 0 ? '' : stats.dmgVal} placeholder="0"
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => onChange({ ...stats, dmgVal: parsePositive(e.target.value) })} />
             <span style={{ color: '#999999', fontSize: '14px' }}>٪</span>
           </div>
         </div>
@@ -431,9 +400,12 @@ function TalentsBlock({ stats, onChange, mainType }) {
           <NumberField label="SPD" value={stats.spdDebuff} onChange={(v) => onChange({ ...stats, spdDebuff: v })} negative />
           <NumberField label="ضرر عادي" value={stats.normalDebuff} onChange={(v) => onChange({ ...stats, normalDebuff: v })} negative />
           <NumberField label="هجوم مضاد" value={stats.counterDebuff} onChange={(v) => onChange({ ...stats, counterDebuff: v })} negative />
+          <NumberField label="المهارة" value={stats.resistSkill} onChange={(v) => onChange({ ...stats, resistSkill: v })} negative />
+          <NumberField label="الضربة القاضية" value={stats.resistFinish} onChange={(v) => onChange({ ...stats, resistFinish: v })} negative />
+          <NumberField label="هجوم المجموعة" value={stats.resistRally} onChange={(v) => onChange({ ...stats, resistRally: v })} negative />
           <NumberField label="ضرر كلي" value={stats.totalDebuff} onChange={(v) => onChange({ ...stats, totalDebuff: v })} icon={TOTAL_DAMAGE_ICON} negative />
         </div>
-        <div style={styles.subTitle}>تقليل الضرر ضد :</div>
+        <div style={styles.subTitle}>تقليل الضرر من:</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           <select style={{ ...styles.input, flex: 1 }} value={stats.vsTypeDebuff} onChange={(e) => onChange({ ...stats, vsTypeDebuff: e.target.value })}>
             <option value="">اختر النوع المستهدف</option>
@@ -443,20 +415,6 @@ function TalentsBlock({ stats, onChange, mainType }) {
             <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={stats.vsValDebuff === 0 ? '' : stats.vsValDebuff} placeholder="0"
               onFocus={(e) => e.target.select()}
               onChange={(e) => onChange({ ...stats, vsValDebuff: parsePositive(e.target.value) })} />
-            <span style={{ color: '#999999', fontSize: '14px', whiteSpace: 'nowrap' }}>-٪</span>
-          </div>
-        </div>
-
-        <div style={styles.subTitle}>تقليل ضرر :</div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <select style={{ ...styles.input, flex: 1 }} value={stats.dmgTypeDebuff} onChange={(e) => onChange({ ...stats, dmgTypeDebuff: e.target.value })}>
-            <option value="">اختر نوع الضرر</option>
-            {TYPES.filter((t) => ['skill', 'finish', 'rally', 'finishRanged', 'rallyRanged', 'skillRanged'].includes(t.key)).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-          </select>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 70px' }}>
-            <input type="text" inputMode="decimal" style={{ ...styles.input, flex: 1 }} value={stats.dmgValDebuff === 0 ? '' : stats.dmgValDebuff} placeholder="0"
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => onChange({ ...stats, dmgValDebuff: parsePositive(e.target.value) })} />
             <span style={{ color: '#999999', fontSize: '14px', whiteSpace: 'nowrap' }}>-٪</span>
           </div>
         </div>
@@ -727,7 +685,7 @@ function MarchPage({ data, setData, onSave, savedAt, leaderData, onLeaderDataCha
         })()}
       </div>
 
-      <TalentsBlock stats={data.talents} onChange={(v) => update({ talents: v })} mainType={TYPES.find((t) => t.key === (leaderData[data.leader1] || leaderData[data.leader2] || {}).damageType)} />
+      <TalentsBlock stats={data.talents} onChange={(v) => update({ talents: v })} />
 
       <EquipBlock stats={data.equip} onChange={(v) => update({ equip: v })} />
 
@@ -839,12 +797,15 @@ function marchTotals(march, leaderData = {}, useExpectedValue = true) {
   const ldr = sumLeaderBaseStats(march.leader1, march.leader2);
 
   const totals = Object.fromEntries(TYPES.map((t) => [t.key, 0]));
-  totals.skill += (fd.skill || 0) + (ldr.skill || 0);
+  totals.skill += (fd.skill || 0) + (ldr.skill || 0) + (tal.skill || 0);
   totals.normal += (fd.normal || 0) + (tal.normal || 0) + (ldr.normal || 0);
   totals.finish += (fd.finish || 0) + (tal.finish || 0) + (ldr.finish || 0);
-  totals.rally += (fd.rally || 0) + (ldr.rally || 0);
+  totals.rally += (fd.rally || 0) + (ldr.rally || 0) + (tal.rally || 0);
   totals.counter += tal.counter || 0;
   totals.finishRanged += tal.finishRanged || 0;
+  totals.resistSkill += tal.resistSkill || 0;
+  totals.resistFinish += tal.resistFinish || 0;
+  totals.resistRally += tal.resistRally || 0;
   totals.atkDebuff += (tal.atkDebuff || 0) + (eq.atkDebuff || 0);
   totals.defDebuff += (tal.defDebuff || 0) + (eq.defDebuff || 0);
   totals.hpDebuff += (tal.hpDebuff || 0) + (eq.hpDebuff || 0);
@@ -856,9 +817,6 @@ function marchTotals(march, leaderData = {}, useExpectedValue = true) {
 
   const mainInfo = leaderData[march.leader1] || leaderData[march.leader2] || {};
   const mainType = TYPES.find((t) => t.key === mainInfo.damageType);
-  if (mainType) applyTypedAmount(totals, mainType.key, tal.dmgVal || 0);
-  const otherDebuffType = TYPES.find((t) => t.key === tal.dmgTypeDebuff);
-
   const troopTypeLabel = (key) => (TROOP_TYPES.find((t) => t.key === key) || {}).name || key;
 
   const effVal = (p) => p.value;
@@ -969,7 +927,7 @@ function marchTotals(march, leaderData = {}, useExpectedValue = true) {
     { key: 'leaders', label: 'القادة', buff: (ldr.atk || 0) + (ldr.normal || 0) + (ldr.skill || 0) + (ldr.finish || 0) + (ldr.rally || 0) + (ldr.total || 0), debuff: 0 },
     { key: 'equip', label: 'المعدات', buff: (eq.atk || 0) + (eq.genAtk || 0) + (eq.traitAtk || 0), debuff: eq.atkDebuff || 0 },
     { key: 'weapon', label: 'الأسلحة', buff: wp.atk || 0, debuff: 0 },
-    { key: 'talents', label: 'المواهب', buff: (tal.atk || 0) + (tal.normal || 0) + (tal.counter || 0) + (tal.finish || 0) + (tal.finishRanged || 0) + (tal.totalDmg || 0) + (mainType ? (tal.dmgVal || 0) : 0) + (tal.vsVal || 0), debuff: (tal.totalDebuff || 0) + (tal.normalDebuff || 0) + (tal.counterDebuff || 0) + (otherDebuffType ? (tal.dmgValDebuff || 0) : 0) + (tal.vsValDebuff || 0) },
+    { key: 'talents', label: 'المواهب', buff: (tal.atk || 0) + (tal.normal || 0) + (tal.counter || 0) + (tal.skill || 0) + (tal.finish || 0) + (tal.rally || 0) + (tal.finishRanged || 0) + (tal.totalDmg || 0) + (tal.vsVal || 0), debuff: (tal.totalDebuff || 0) + (tal.normalDebuff || 0) + (tal.counterDebuff || 0) + (tal.resistSkill || 0) + (tal.resistFinish || 0) + (tal.resistRally || 0) + (tal.vsValDebuff || 0) },
     { key: 'formation', label: 'التشكيل', buff: formationTotal, debuff: 0 },
     { key: 'inscriptions', label: 'النقوش', buff: inscripBuff, debuff: inscripDebuff },
   ];
@@ -1001,9 +959,8 @@ function marchTotals(march, leaderData = {}, useExpectedValue = true) {
     ]) },
     { key: 'talents', label: 'المواهب', items: nz([
       { label: 'ATK', value: tal.atk }, { label: 'DEF', value: tal.def }, { label: 'HP', value: tal.hp }, { label: 'SPD', value: tal.spd },
-      { label: 'الضرر العادي', value: tal.normal }, { label: 'هجوم مضاد', value: tal.counter }, { label: 'ضربة قاضية', value: tal.finish }, { label: 'قاضية بعيد المدى', value: tal.finishRanged },
+      { label: 'الضرر العادي', value: tal.normal }, { label: 'هجوم مضاد', value: tal.counter }, { label: 'ضرر المهارة', value: tal.skill }, { label: 'ضربة قاضية', value: tal.finish }, { label: 'هجوم المجموعة', value: tal.rally }, { label: 'قاضية بعيد المدى', value: tal.finishRanged },
       { label: 'الضرر الكلي', value: tal.totalDmg },
-      ...(mainType ? [{ label: `${mainType.label} (نوع القائد الرئيسي)`, value: tal.dmgVal }] : []),
       ...(tal.vsType ? [{ label: `ضرر ضد ${troopTypeLabel(tal.vsType)}`, value: tal.vsVal }] : []),
     ]) },
     { key: 'formation', label: 'التشكيل', items: nz([
@@ -1018,8 +975,7 @@ function marchTotals(march, leaderData = {}, useExpectedValue = true) {
     ]) },
     { key: 'talents', label: 'المواهب', items: nz([
       { label: 'ATK', value: tal.atkDebuff }, { label: 'DEF', value: tal.defDebuff }, { label: 'HP', value: tal.hpDebuff }, { label: 'SPD', value: tal.spdDebuff }, { label: 'الضرر الكلي', value: tal.totalDebuff },
-      { label: 'الضرر العادي', value: tal.normalDebuff }, { label: 'هجوم مضاد', value: tal.counterDebuff },
-      ...(otherDebuffType ? [{ label: otherDebuffType.label, value: tal.dmgValDebuff }] : []),
+      { label: 'الضرر العادي', value: tal.normalDebuff }, { label: 'هجوم مضاد', value: tal.counterDebuff }, { label: 'المهارة', value: tal.resistSkill }, { label: 'الضربة القاضية', value: tal.resistFinish }, { label: 'هجوم المجموعة', value: tal.resistRally },
       ...(tal.vsTypeDebuff ? [{ label: `ضرر ضد ${troopTypeLabel(tal.vsTypeDebuff)}`, value: tal.vsValDebuff }] : []),
     ]) },
     { key: 'inscriptions', label: 'النقوش', items: nz(inscripItems('debuff')) },
@@ -1041,11 +997,14 @@ function MarchSummary({ data, leaderData, useExpectedValue }) {
     { label: 'SPD', value: Math.round(((guaranteedByKey.spd || 0) + (guaranteedTotals.spdBuff || 0)) * 100) / 100, withChance: Math.round(((byKey.spd || 0) + (damageTotals.spdBuff || 0)) * 100) / 100 },
     { label: 'الضرر العادي', value: Math.round((guaranteedTotals.normal || 0) * 100) / 100, withChance: Math.round((damageTotals.normal || 0) * 100) / 100 },
     { label: 'هجوم مضاد', value: Math.round((damageTotals.counter || 0) * 100) / 100 },
+    { label: 'المهارة', value: Math.round((damageTotals.skill || 0) * 100) / 100 },
+    { label: 'الضربة القاضية', value: Math.round((damageTotals.finish || 0) * 100) / 100 },
+    { label: 'هجوم المجموعة', value: Math.round((damageTotals.rally || 0) * 100) / 100 },
     { label: 'الضرر الكلي', value: Math.round((guaranteedTotals.total || 0) * 100) / 100, withChance: Math.round((damageTotals.total || 0) * 100) / 100 },
   ];
 
   const damageList = TYPES
-    .filter((t) => t.key !== 'total' && t.key !== 'normal' && t.key !== 'counter' && t.key !== 'spdBuff' && t.key !== 'resist' && t.key !== 'ignoreDef' && t.key !== 'ignoreHp' && t.key !== 'resistCounter' && t.key !== 'resistSkill' && t.key !== 'resistFinish' && t.key !== 'resistRally')
+    .filter((t) => t.key !== 'total' && t.key !== 'normal' && t.key !== 'counter' && t.key !== 'spdBuff' && t.key !== 'resist' && t.key !== 'ignoreDef' && t.key !== 'ignoreHp' && t.key !== 'resistCounter' && t.key !== 'resistSkill' && t.key !== 'resistFinish' && t.key !== 'resistRally' && t.key !== 'skill' && t.key !== 'finish' && t.key !== 'rally')
     .map((t) => ({ key: t.key, label: t.label, value: Math.round(damageTotals[t.key] * 100) / 100, cls: TYPE_CLASS[t.key] }))
     .filter((d) => d.value !== 0);
   const STAT_DEBUFF_KEYS = ['atkDebuff', 'defDebuff', 'hpDebuff', 'spdDebuff', 'totalDebuff', 'normalDebuff', 'counterDebuff'];
@@ -1355,8 +1314,8 @@ function MarchLeaderCompareChart({ marchHistory, leaderData, overrideEntries, us
         const tal = entry.talents || {};
         const mainValue = mainType ? (guaranteedTotals[mainType.key] || 0) : 0;
         const mainLabel = mainType ? `الضرر الرئيسي (${mainType.label})` : 'الضرر الرئيسي';
-        const otherDebuffType = TYPES.find((t) => t.key === tal.dmgTypeDebuff);
-        const debuffMatchesMain = otherDebuffType && mainType && otherDebuffType.key === mainType.key;
+        const MAIN_DEBUFF_KEY = { skill: 'resistSkill', finish: 'resistFinish', rally: 'resistRally' };
+        const mainDebuffKey = mainType ? MAIN_DEBUFF_KEY[mainType.key] : null;
 
         const values = [
           { key: 'atk', label: 'الهجوم', value: Math.round((byKey.atk || 0) * 100) / 100, color: '#e34948', debuff: Math.round((damageTotals.atkDebuff || 0) * 100) / 100 },
@@ -1364,18 +1323,8 @@ function MarchLeaderCompareChart({ marchHistory, leaderData, overrideEntries, us
           { key: 'hp', label: 'الصحة', value: Math.round((byKey.hp || 0) * 100) / 100, color: '#4ade80', debuff: Math.round(((damageTotals.hpDebuff || 0) + (damageTotals.ignoreHp || 0)) * 100) / 100 },
           { key: 'total', label: 'الضرر الكلي', value: Math.round((guaranteedTotals.total || 0) * 100) / 100, color: '#f2994a', debuff: Math.round(((damageTotals.totalDebuff || 0) + (damageTotals.resist || 0)) * 100) / 100 },
           { key: 'normal', label: 'الضرر العادي', value: Math.round((guaranteedTotals.normal || 0) * 100) / 100, color: '#a97fd6', debuff: Math.round((damageTotals.normalDebuff || 0) * 100) / 100 },
-          { key: 'main', label: mainLabel, value: Math.round(mainValue * 100) / 100, color: '#eda100', debuff: debuffMatchesMain ? Math.round((tal.dmgValDebuff || 0) * 100) / 100 : 0 },
+          { key: 'main', label: mainLabel, value: Math.round(mainValue * 100) / 100, color: '#eda100', debuff: mainDebuffKey ? Math.round((damageTotals[mainDebuffKey] || 0) * 100) / 100 : 0 },
         ];
-
-        if (otherDebuffType && !debuffMatchesMain) {
-          values.push({
-            key: 'otherDebuff',
-            label: `ضرر ${otherDebuffType.label}`,
-            value: Math.round((damageTotals[otherDebuffType.key] || 0) * 100) / 100,
-            color: '#5ec8d8',
-            debuff: Math.round((tal.dmgValDebuff || 0) * 100) / 100,
-          });
-        }
 
         return { idx: i, name: entry.leader1 || entry.leader2 || '—', leader1: entry.leader1, leader2: entry.leader2, mainType, finalCoefficient, normalAffectsMain, mainTypeVal: mainType ? (guaranteedTotals[mainType.key] || 0) : 0, normalVal: guaranteedTotals.normal || 0, values };
       })
